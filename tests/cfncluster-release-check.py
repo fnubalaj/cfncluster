@@ -90,6 +90,7 @@ def run_test(region, distro, scheduler, instance_type, key_name, key_path):
 
     master_ip = ''
     username = username_map[distro]
+    exception_raised = False;
 
     try:
         # build the cluster
@@ -107,9 +108,10 @@ def run_test(region, distro, scheduler, instance_type, key_name, key_path):
                 master_ip = m.group(1)
                 break
         if master_ip == '':
-            print('!! %s: Master IP not found; aborting !!' % (testname))
+            stderr_f.write('!! %s: Master IP not found; aborting !!' % (testname))
+            exception_raised = True
             raise Exception('Master IP not found')
-        print("--> %s master ip: %s" % (testname, master_ip))
+        stdout_f.write("--> %s master ip: %s" % (testname, master_ip))
 
         # run test on the cluster...
         ssh_params = ['-o', 'StrictHostKeyChecking=no']
@@ -123,7 +125,8 @@ def run_test(region, distro, scheduler, instance_type, key_name, key_path):
             stdout=stdout_f, stderr=stderr_f)
 
     except Exception as e:
-        sys.stdout.write("!! FAILURE: %s!!\n" % (testname))
+        stderr_f.write("!! FAILURE: %s!!\n" % (testname))
+        exception_raised = True
         raise e
 
     finally:
@@ -132,6 +135,11 @@ def run_test(region, distro, scheduler, instance_type, key_name, key_path):
                         stdout=stdout_f, stderr=stderr_f)
         stdout_f.close()
         stderr_f.close()
+        if exception_raised:
+            open('%s.failed' %testname, 'w').close()
+        else:
+            open('%s.success' %testname, 'w').close()
+
         os.remove(test_filename)
 
 
@@ -201,14 +209,15 @@ if __name__ == '__main__':
     scheduler_list = config['schedulers'].split(',')
     instance_type_list = config['instance_types'].split(',')
 
-    print("==> Regions: %s" % (', '.join(region_list)))
-    print("==> Distros: %s" % (', '.join(distro_list)))
-    print("==> Schedulers: %s" % (', '.join(scheduler_list)))
-    print("==> Parallelism: %d" % (config['parallelism']))
-    print("==> Instance Types: %s" % (', '.join(instance_type_list)))
-    print("==> Key Pair: %s" % (config['key_name']))
+    aggregate_f = open('test-aggregate.txt', 'w');
+    aggregate_f.write("==> Regions: %s" % (', '.join(region_list)))
+    aggregate_f.write("==> Distros: %s" % (', '.join(distro_list)))
+    aggregate_f.write("==> Schedulers: %s" % (', '.join(scheduler_list)))
+    aggregate_f.write("==> Parallelism: %d" % (config['parallelism']))
+    aggregate_f.write("==> Instance Types: %s" % (', '.join(instance_type_list)))
+    aggregate_f.write("==> Key Pair: %s" % (config['key_name']))
     if config['key_path']:
-        print("==> Key Path: %s" % (config['key_path']))
+        aggregate_f.write("==> Key Path: %s" % (config['key_path']))
 
     # Populate subnet / vpc data for all regions we're going to test.
     for region in region_list:
@@ -217,14 +226,14 @@ if __name__ == '__main__':
                                                   'Values': [ 'CfnClusterTestSubnet' ]}],
                                         MaxResults=16)
         if len(response['Tags']) == 0:
-            print('Could not find subnet in %s with CfnClusterTestSubnet tag.  Aborting.' %
+            aggregate_f.write('Could not find subnet in %s with CfnClusterTestSubnet tag.  Aborting.' %
                   (region))
             exit(1)
         subnetid = response['Tags'][0]['ResourceId']
 
         response = client.describe_subnets(SubnetIds = [ subnetid ])
         if len(response) == 0:
-            print('Could not find subnet info for %s' % (subnetid))
+            aggregate_f.write('Could not find subnet info for %s' % (subnetid))
             exit(1)
         vpcid = response['Subnets'][0]['VpcId']
 
@@ -254,7 +263,7 @@ if __name__ == '__main__':
         work_queues[region].join()
 
     # print status...
-    print("==> Success: %d" % (success))
-    print("==> Failure: %d" % (failure))
+    aggregate_f.write("==> Success: %d" % (success))
+    aggregate_f.write("==> Failure: %d" % (failure))
     if failure != 0:
         exit(1)
