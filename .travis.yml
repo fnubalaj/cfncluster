@@ -19,4 +19,6 @@ install:
 
 sudo: false
 
-script: sh tests/test.sh
+script:
+  - python cli/tests/cfncluster-unittest.py
+  - sh tests/test.sh
