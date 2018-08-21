@@ -215,7 +215,7 @@ scaledown_check_launch() {
     # bounded completion time
     if test "$CHECK_CLUSTER_SUBPROCESS" = ""; then
         export CHECK_CLUSTER_SUBPROCESS=1
-        timeout -s KILL 3m /bin/bash ./cluster-check.sh "$@"
+        timeout -s KILL 5m /bin/bash ./cluster-check.sh "$@"
         exit $?
     fi
 
@@ -226,7 +226,7 @@ scaledown_check_launch() {
     scaledown_complete=0
     while test $scaledown_complete = 0 ; do
         ${scheduler}_scaledown_check
-        sleep 10
+        sleep 1
     done
     echo "Scaledown successful"
 }
