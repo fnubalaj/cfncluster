@@ -87,22 +87,23 @@ def _double_writeln(fileo, message):
 def check_asg_capacity(stack_name, region, out_f):
     asg_conn = boto3.client('autoscaling', region_name=region)
     iter = 0
-    while iter < 12:
+    capacity = -1
+    while iter < 24 and capacity != 0:
         try:
             r = asg_conn.describe_tags(Filters=[{'Name': 'value', 'Values': [stack_name]}])
             asg_name = r.get('Tags')[0].get('ResourceId')
             response = asg_conn.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
             capacity = response["AutoScalingGroups"][0]["DesiredCapacity"]
-            _double_writeln(out_f, "ASG Capacity was %s for %s minute(s)" % (capacity, iter))
-            if capacity == 0:
-                return True
             iter += 1
-            time.sleep(60)
+            time.sleep(10)
         except Exception as e:
             _double_writeln(out_f, "check_asg_capacity failed with %s exception: %s" % (type(e), e))
             raise
 
-    return False
+    _double_writeln(out_f, "ASG Capacity was %s after %s second(s)" % (capacity, 10 * iter))
+    if capacity != 0:
+        raise ReleaseCheckException("Autoscaling group's desired capacity was not zero. Capacity was %s" % capacity)
+
 
 
 #
@@ -190,19 +191,13 @@ def run_test(region, distro, scheduler, instance_type, key_name, extra_args):
         # Sleep for scaledown_idletime to give time for the instances to scale down
         time.sleep(60*scaledown_idletime)
 
-        asg_capacity_is_zero = check_asg_capacity('cfncluster-' + testname, region, out_f)
-
-        if not asg_capacity_is_zero:
-            _double_writeln(out_f, "Autoscaling group's desired capacity was not zero")
-            _double_writeln(out_f, "!! FAILURE: %s!!" % testname)
-            raise ReleaseCheckException("Autoscaling group's desired capacity was not zero")
+        check_asg_capacity('cfncluster-' + testname, region, out_f)
 
         prochelp.exec_command(['ssh', '-n'] + ssh_params + ['%s@%s' % (username, master_ip), '/bin/bash --login cluster-check.sh scaledown_check %s' % scheduler],
                               stdout=out_f, stderr=sub.STDOUT, universal_newlines=True)
 
         _double_writeln(out_f, 'SUCCESS:  %s!!' % testname)
         open('%s.success' % testname, 'w').close()
-
     except prochelp.ProcessHelperError as exc:
         if not _create_done and isinstance(exc, prochelp.KilledProcessError):
             _create_interrupted = True
