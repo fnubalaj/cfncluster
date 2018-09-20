@@ -1300,6 +1300,18 @@
         }
       ]
     },
+    "UseProxy": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "ProxyServer"
+            },
+            "NONE"
+          ]
+        }
+      ]
+    },
     "MaintainInitialASGSize": {
       "Fn::Equals": [
         {
@@ -2409,16 +2421,28 @@
                 "MIME-Version: 1.0\n\n",
                 "#cloud-config:\n",
                 "runcmd:\n",
-                " - [  sh, \"which yum && echo ",
+                " - [ sh, -c, 'which yum && echo \"proxy=",
                 {
-                  "Ref": "ProxyServer"
+                  "Fn::If": [
+                    "UseProxy",
+                    {
+                      "Ref": "ProxyServer"
+                    },
+                    "_none_"
+                  ]
                 },
-                " >> /etc/yum.conf\" ]\n",
-                " - [ sh, \"which apt-get && echo Acquire::http::Proxy ",
+                "\" >> /etc/yum.conf' ]\n",
+                " - [ sh, -c, 'which apt-get && echo \"Acquire::http::Proxy \\\"",
                 {
-                  "Ref": "ProxyServer"
+                  "Fn::If": [
+                    "UseProxy",
+                    {
+                      "Ref": "ProxyServer"
+                    },
+                    "false"
+                  ]
                 },
-                "; >> /etc/apt/apt.conf\" ]\n",
+                "\\\";\" >> /etc/apt/apt.conf ]\n",
                 "--==BOUNDARY==\n",
                 "Content-Type: text/x-shellscript; charset=\"us-ascii\"\n",
                 "MIME-Version: 1.0\n\n",
@@ -2661,6 +2685,9 @@
                     },
                     "compute_instance_type": {
                       "Ref": "ComputeInstanceType"
+                    },
+                    "cfn_max_queue_size": {
+                      "Ref": "MaxQueueSize"
                     },
                     "cfn_node_type": "MasterServer",
                     "cfn_cluster_user": {
@@ -3121,16 +3148,28 @@
                 "MIME-Version: 1.0\n\n",
                 "#cloud-config:\n",
                 "runcmd:\n",
-                " - [  sh, \"which yum && echo ",
+                " - [ sh, -c, 'which yum && echo \"proxy=",
                 {
-                  "Ref": "ProxyServer"
+                  "Fn::If": [
+                    "UseProxy",
+                    {
+                      "Ref": "ProxyServer"
+                    },
+                    "_none_"
+                  ]
                 },
-                " >> /etc/yum.conf\" ]\n",
-                " - [ sh, \"which apt-get && echo Acquire::http::Proxy ",
+                "\" >> /etc/yum.conf' ]\n",
+                " - [ sh, -c, 'which apt-get && echo \"Acquire::http::Proxy \\\"",
                 {
-                  "Ref": "ProxyServer"
+                  "Fn::If": [
+                    "UseProxy",
+                    {
+                      "Ref": "ProxyServer"
+                    },
+                    "false"
+                  ]
                 },
-                "; >> /etc/apt/apt.conf\" ]\n",
+                "\\\";\" >> /etc/apt/apt.conf' ]\n",
                 "--==BOUNDARY==\n",
                 "Content-Type: text/x-shellscript; charset=\"us-ascii\"\n",
                 "MIME-Version: 1.0\n\n",
